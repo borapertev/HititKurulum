@@ -1,67 +1,86 @@
 # SQL Server Kurulum Scripti
-param(
-    [Parameter(Mandatory=$true)]
-    [string]$SqlPassword
-)
+
+# Yönetici hakları kontrolü
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "Bu script yonetici haklari gerektiriyor!" -ForegroundColor Red
+    Write-Host "Lutfen PowerShell'i yonetici olarak calistirip tekrar deneyin." -ForegroundColor Yellow
+    exit
+}
 
 Write-Host "SQL Server Express Kurulumu Baslatiliyor..." -ForegroundColor Yellow
 Write-Host "------------------------------------------------" -ForegroundColor Yellow
 
-$tempPath = "$env:TEMP\MironSetup"
-Write-Host "Indirme klasoru: $tempPath" -ForegroundColor Cyan
-New-Item -ItemType Directory -Force -Path $tempPath | Out-Null
-
 try {
-    # SQL Server Express kurulumu
-    Write-Host "SQL Server Express kuruluyor..." -ForegroundColor Cyan
-    Write-Host "Bu islem biraz zaman alabilir, lutfen bekleyin..." -ForegroundColor Yellow
+    # SQL Server kurulumu kontrolü
+    Write-Host "Mevcut kurulum kontrol ediliyor..." -ForegroundColor Cyan
+    $sqlRegKey = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server" -ErrorAction SilentlyContinue
+    $sqlInstances = @()
     
-    $sqlExpressPath = "$PSScriptRoot\..\kurulum\SQLServer2016-SSEI-Expr.exe"
-    
-    # SQL Server kurulum parametreleri
-    $installArgs = "/IACCEPTSQLSERVERLICENSETERMS /QUIET /ACTION=Install /FEATURES=SQL /INSTANCENAME=SQLEXPRESS " + `
-                  "/SQLSYSADMINACCOUNTS=`"BUILTIN\Administrators`" /SECURITYMODE=SQL /SAPWD=`"$SqlPassword`" " + `
-                  "/TCPENABLED=1 /NPENABLED=1 /HIDECONSOLE=1"
-    
-    Write-Host "Kurulum baslatiliyor..." -ForegroundColor Yellow
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $sqlExpressPath
-    $startInfo.Arguments = $installArgs
-    $startInfo.UseShellExecute = $false
-    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
-    $startInfo.CreateNoWindow = $true
-    
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
-    $process.Start() | Out-Null
-    $process.WaitForExit()
-    
-    Write-Host "Kurulum islemi tamamlandi. Exit Code: $($process.ExitCode)" -ForegroundColor Yellow
-    
-    if ($process.ExitCode -eq 0) {
-        Write-Host "SQL Server Express kurulumu basariyla tamamlandi!" -ForegroundColor Green
-        Write-Host "SA Kullanici sifreniz guvenli bir yerde saklanmalidir." -ForegroundColor Yellow
-    } else {
-        Write-Host "SQL Server kurulumunda hata olustu! Exit Code: $($process.ExitCode)" -ForegroundColor Red
-        Write-Host "Lutfen log dosyalarini kontrol edin." -ForegroundColor Yellow
-        
-        # Log dosyalarını C: sürücüsüne kopyala
-        Get-ChildItem "$env:ProgramFiles\Microsoft SQL Server\*\Setup Bootstrap\Log" -Recurse -Filter "Summary*.txt" | 
-        Sort-Object LastWriteTime -Descending | 
-        Select-Object -First 1 | 
-        ForEach-Object {
-            $targetPath = "C:\SQLServer_Summary_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
-            Copy-Item $_.FullName $targetPath
-            Write-Host "Kurulum ozeti kaydedildi: $targetPath" -ForegroundColor Yellow
-            Get-Content $targetPath | ForEach-Object {
-                Write-Host $_ -ForegroundColor Gray
-            }
-        }
+    if ($sqlRegKey -and (Get-Member -InputObject $sqlRegKey -Name "InstalledInstances" -ErrorAction SilentlyContinue)) {
+        $sqlInstances = $sqlRegKey.InstalledInstances
     }
+    
+    if ($sqlInstances -contains "HITIT") {
+        Write-Host "`nSQL Server Express zaten kurulu." -ForegroundColor Green
+        return
+    }
+
+    # Temp klasörü oluştur
+    $tempFolder = "$env:TEMP\SQLServerSetup"
+    if (Test-Path $tempFolder) {
+        Remove-Item $tempFolder -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $tempFolder -Force | Out-Null
+
+    # SQL Server Express'i indir
+    $sqlDownloadUrl = "https://download.microsoft.com/download/9/0/7/907AD35F-9F9C-43A5-9789-52470555DB90/ENU/SQLEXPR_x64_ENU.exe"
+    $sqlInstallerPath = Join-Path $tempFolder "SQLEXPR_x64_ENU.exe"
+
+    Write-Host "`nSQL Server Express indiriliyor..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $sqlDownloadUrl -OutFile $sqlInstallerPath
+
+    if (Test-Path $sqlInstallerPath) {
+        Write-Host "SQL Server Express indirme tamamlandi." -ForegroundColor Green
+        Write-Host "`nKurulum basliyor..." -ForegroundColor Cyan
+        Write-Host "Bu islem 10-20 dakika surebilir." -ForegroundColor Yellow
+
+        # Kurulum parametreleri
+        $installArgs = "/QUIET /IACCEPTSQLSERVERLICENSETERMS /ACTION=Install /FEATURES=SQLEngine /INSTANCENAME=HITIT /SECURITYMODE=SQL /SAPWD=00560056 /SQLSYSADMINACCOUNTS=`"BUILTIN\Administrators`" /BROWSERSVCSTARTUPTYPE=Automatic /ERRORREPORTING=0"
+        
+        # Kurulumu başlat
+        $process = Start-Process -FilePath $sqlInstallerPath -ArgumentList $installArgs -Wait -PassThru -Verb RunAs
+        
+        if ($process.ExitCode -eq 0) {
+            Write-Host "`n------------------------------------------------" -ForegroundColor Yellow
+            Write-Host "SQL Server Express kurulumu basariyla tamamlandi!" -ForegroundColor Green
+            Write-Host "Instance: HITIT" -ForegroundColor Cyan
+            Write-Host "SA Sifresi: 00560056" -ForegroundColor Cyan
+            Write-Host "------------------------------------------------" -ForegroundColor Yellow
+        } else {
+            Write-Host "`n------------------------------------------------" -ForegroundColor Yellow
+            Write-Host "SQL Server kurulumunda hata olustu! Exit Code: $($process.ExitCode)" -ForegroundColor Red
+            Write-Host "Lutfen kurulum loglarini kontrol edin: $env:ProgramFiles\Microsoft SQL Server\130\Setup Bootstrap\Log" -ForegroundColor Yellow
+            Write-Host "------------------------------------------------" -ForegroundColor Yellow
+        }
+    } else {
+        throw "SQL Server Express indirilemedi!"
+    }
+    
 } catch {
+    Write-Host "`n------------------------------------------------" -ForegroundColor Yellow
     Write-Host "Hata olustu: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Hata detayi: $($_)" -ForegroundColor Red
+    Write-Host "------------------------------------------------" -ForegroundColor Yellow
 } finally {
-    Write-Host "`nGecici dosyalar temizleniyor..." -ForegroundColor Yellow
-    Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue
+    # Temp klasörünü temizle
+    if (Test-Path $tempFolder) {
+        Remove-Item $tempFolder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Add progress bar for long operations
+function Show-Progress {
+    param($Activity, $Status, $PercentComplete)
+    Write-Progress -Activity $Activity -Status $Status -PercentComplete $PercentComplete
 }

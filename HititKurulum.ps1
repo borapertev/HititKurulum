@@ -5,6 +5,23 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
     break
 }
 
+# Add a config file for easier maintenance
+$config = @{
+    SqlDownloadUrl = "https://go.microsoft.com/fwlink/?LinkID=799012"
+    InstallationPaths = @{
+        ReportViewer = "..\kurulum\REPORTS ViEW"
+        SSMS = "..\kurulum\SSMS-Setup-ENU.exe"
+    }
+}
+
+# Add centralized logging
+function Write-Log {
+    param($Message, $Level = "Info")
+    $logFile = ".\HititKurulum.log"
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp [$Level] $Message" | Add-Content $logFile
+}
+
 function Show-MironLogo {
     Write-Host "
     MMMMMMMM               MMMMMMMM IIIIIIIIII RRRRRRRRRRRRRRRRR        OOOOOOOOO     NNNNNNNN        NNNNNNNN
@@ -49,6 +66,15 @@ function Get-SqlPassword {
     return $password
 }
 
+# Add cleanup function for temporary files
+function Clear-InstallationTemp {
+    param($Path)
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Recurse -Force
+        Write-Log "Cleaned up temporary files at $Path"
+    }
+}
+
 # Main program loop
 do {
     Show-Menu
@@ -65,8 +91,7 @@ do {
         }
         '3' {
             Write-Host "`nSQL Server Express kurulumu secildi." -ForegroundColor Yellow
-            $sqlPassword = Read-Host -Prompt "SQL Server SA kullanici sifresi"
-            & "$PSScriptRoot\scripts\install-sql.ps1" -SqlPassword $sqlPassword
+            & "$PSScriptRoot\scripts\install-sql.ps1"
         }
         '4' {
             Write-Host "`nSQL Server Management Studio kurulumu secildi." -ForegroundColor Yellow
@@ -76,8 +101,7 @@ do {
             Write-Host "`nTum bilesenler kuruluyor..." -ForegroundColor Cyan
             & "$PSScriptRoot\scripts\install-iis.ps1"
             & "$PSScriptRoot\scripts\install-tools.ps1"
-            $sqlPassword = Get-SqlPassword
-            & "$PSScriptRoot\scripts\install-sql.ps1" -SqlPassword $sqlPassword
+            & "$PSScriptRoot\scripts\install-sql.ps1"
             & "$PSScriptRoot\scripts\install-ssms.ps1"
         }
         'Q' {
