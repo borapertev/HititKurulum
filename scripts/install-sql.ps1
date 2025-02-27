@@ -12,26 +12,20 @@ Write-Host "Indirme klasoru: $tempPath" -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path $tempPath | Out-Null
 
 try {
-    # SQL Server Express indirme ve kurulum
-    Write-Host "SQL Server Express indiriliyor..." -ForegroundColor Cyan
-    $sqlExpressUrl = "https://go.microsoft.com/fwlink/?linkid=866658"
-    $sqlExpressOutput = "$tempPath\SQLEXPR.exe"
-    
-    Write-Host "Indirme basladi..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $sqlExpressUrl -OutFile $sqlExpressOutput
-    Write-Host "Indirme tamamlandi: $sqlExpressOutput" -ForegroundColor Green
-    
+    # SQL Server Express kurulumu
     Write-Host "SQL Server Express kuruluyor..." -ForegroundColor Cyan
     Write-Host "Bu islem biraz zaman alabilir, lutfen bekleyin..." -ForegroundColor Yellow
     
+    $sqlExpressPath = "$PSScriptRoot\..\kurulum\SQLServer2016-SSEI-Expr.exe"
+    
     # SQL Server kurulum parametreleri
-    $installArgs = "/IACCEPTSQLSERVERLICENSETERMS /ACTION=Install /FEATURES=SQL /INSTANCENAME=SQLEXPRESS " + `
+    $installArgs = "/IACCEPTSQLSERVERLICENSETERMS /QUIET /ACTION=Install /FEATURES=SQL /INSTANCENAME=SQLEXPRESS " + `
                   "/SQLSYSADMINACCOUNTS=`"BUILTIN\Administrators`" /SECURITYMODE=SQL /SAPWD=`"$SqlPassword`" " + `
-                  "/QUIET /HIDECONSOLE=1"
+                  "/TCPENABLED=1 /NPENABLED=1 /HIDECONSOLE=1"
     
     Write-Host "Kurulum baslatiliyor..." -ForegroundColor Yellow
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $sqlExpressOutput
+    $startInfo.FileName = $sqlExpressPath
     $startInfo.Arguments = $installArgs
     $startInfo.UseShellExecute = $false
     $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden

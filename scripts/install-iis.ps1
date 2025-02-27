@@ -1,26 +1,60 @@
-# IIS and .NET Framework Installation Script
+# IIS ve .NET Framework Kurulum Scripti
 
-Write-Host "Starting IIS and .NET Framework Installation..." -ForegroundColor Yellow
+Write-Host "IIS ve .NET Framework Kurulumu Baslatiliyor..." -ForegroundColor Yellow
 Write-Host "------------------------------------------------" -ForegroundColor Yellow
 
 try {
-    # IIS Web Server and basic features
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-CommonHttpFeatures -All -NoRestart
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-DefaultDocument -All -NoRestart
+    # Windows özelliklerini yükle
+    Write-Host "Windows ozellikleri yukleniyor..." -ForegroundColor Cyan
     
-    # ASP.NET 2.0-4.8
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET -All -NoRestart
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET45 -All -NoRestart
-    Enable-WindowsOptionalFeature -Online -FeatureName NetFx3 -All -NoRestart # .NET Framework 3.5 (includes 2.0)
-    
-    # IIS Management Tools
-    Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart
-    
-    Write-Host "IIS ve .NET Framework kurulumu basariyla tamamlandi!" -ForegroundColor Green
-}
-catch {
-    Write-Host "An error occurred during installation: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Lutfen PowerShell'i yonetici olarak calistirdiginizdan emin olun." -ForegroundColor Yellow
+    $features = @(
+        "IIS-WebServerRole",
+        "IIS-WebServer",
+        "IIS-CommonHttpFeatures",
+        "IIS-HttpErrors",
+        "IIS-ApplicationDevelopment",
+        "IIS-NetFxExtensibility45",
+        "IIS-NetFxExtensibility",
+        "IIS-HealthAndDiagnostics",
+        "IIS-HttpLogging",
+        "IIS-Security",
+        "IIS-RequestFiltering",
+        "IIS-Performance",
+        "IIS-WebServerManagementTools",
+        "IIS-ManagementScriptingTools",
+        "IIS-IIS6ManagementCompatibility",
+        "IIS-StaticContent",
+        "IIS-DefaultDocument",
+        "IIS-DirectoryBrowsing",
+        "IIS-WebSockets",
+        "IIS-ASPNET",
+        "IIS-ASPNET45",
+        "IIS-ASP",
+        "IIS-CGI",
+        "IIS-ISAPIExtensions",
+        "IIS-ISAPIFilter",
+        "IIS-ServerSideIncludes",
+        "NetFx4Extended-ASPNET45",
+        "WAS-WindowsActivationService",
+        "WAS-ProcessModel",
+        "WAS-NetFxEnvironment",
+        "WAS-ConfigurationAPI",
+        "NetFx3",
+        "NetFx3ServerFeatures"
+    )
+
+    foreach ($feature in $features) {
+        Write-Host "Yukleniyor: $feature" -ForegroundColor Cyan
+        $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature -All -NoRestart
+        if ($result.RestartNeeded) {
+            Write-Host "UYARI: $feature icin sistem yeniden baslatilmasi gerekebilir." -ForegroundColor Yellow
+        }
+    }
+
+    Write-Host "IIS ve .NET Framework kurulumu tamamlandi!" -ForegroundColor Green
+    Write-Host "NOT: Tum ozelliklerin aktif olmasi icin sistemi yeniden baslatmaniz gerekebilir." -ForegroundColor Yellow
+
+} catch {
+    Write-Host "Hata olustu: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Hata detayi: $($_)" -ForegroundColor Red
 }

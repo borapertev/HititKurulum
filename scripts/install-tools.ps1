@@ -3,40 +3,44 @@
 Write-Host "ReportViewer Kurulumu Baslatiliyor..." -ForegroundColor Yellow
 Write-Host "------------------------------------------------" -ForegroundColor Yellow
 
-$tempPath = "$env:TEMP\MironSetup"
-New-Item -ItemType Directory -Force -Path $tempPath | Out-Null
-
 try {
-    # ReportViewer kurulumu
-    Write-Host "ReportViewer dosya konumu: $PSScriptRoot\..\reports" -ForegroundColor Cyan
-    Write-Host "ReportViewer kuruluyor..." -ForegroundColor Cyan
-    
-    $reportViewerPath = "$PSScriptRoot\..\reports\ReportViewer.exe"
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $reportViewerPath
-    $startInfo.Arguments = "/q"
-    $startInfo.UseShellExecute = $false
-    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
-    $startInfo.CreateNoWindow = $true
-    
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
-    $process.Start() | Out-Null
-    $process.WaitForExit()
-    
-    $reportViewerPath2 = "$PSScriptRoot\..\reports\ReportViewer (1).exe"
-    $startInfo.FileName = $reportViewerPath2
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
-    $process.Start() | Out-Null
-    $process.WaitForExit()
-    
+    # Dosya yollarını kontrol et
+    $reportViewerDir = Join-Path $PSScriptRoot "..\kurulum\REPORTS ViEW"
+    $reportViewer1 = Join-Path $reportViewerDir "ReportViewer.exe"
+    $reportViewer2 = Join-Path $reportViewerDir "ReportViewer (1).exe"
+
+    Write-Host "Dosya konumu: $reportViewerDir" -ForegroundColor Cyan
+
+    # Dosyaların varlığını kontrol et
+    if (-not (Test-Path $reportViewer1)) {
+        Write-Host "HATA: $reportViewer1 bulunamadi!" -ForegroundColor Red
+        return
+    }
+    if (-not (Test-Path $reportViewer2)) {
+        Write-Host "HATA: $reportViewer2 bulunamadi!" -ForegroundColor Red
+        return
+    }
+
+    Write-Host "ReportViewer dosyalari bulundu, kurulum basliyor..." -ForegroundColor Cyan
+
+    # İlk ReportViewer kurulumu
+    Write-Host "ReportViewer 1 kuruluyor..." -ForegroundColor Yellow
+    $process = Start-Process -FilePath $reportViewer1 -ArgumentList "/q" -Wait -PassThru -NoNewWindow
+    if ($process.ExitCode -ne 0) {
+        Write-Host "ReportViewer 1 kurulumunda hata! Exit Code: $($process.ExitCode)" -ForegroundColor Red
+        return
+    }
+
+    # İkinci ReportViewer kurulumu
+    Write-Host "ReportViewer 2 kuruluyor..." -ForegroundColor Yellow
+    $process = Start-Process -FilePath $reportViewer2 -ArgumentList "/q" -Wait -PassThru -NoNewWindow
+    if ($process.ExitCode -ne 0) {
+        Write-Host "ReportViewer 2 kurulumunda hata! Exit Code: $($process.ExitCode)" -ForegroundColor Red
+        return
+    }
+
     Write-Host "Kurulum basariyla tamamlandi!" -ForegroundColor Green
-}
-catch {
+} catch {
     Write-Host "Hata olustu: $($_.Exception.Message)" -ForegroundColor Red
-}
-finally {
-    # Cleanup
-    Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Hata detayi: $($_)" -ForegroundColor Red
 }
